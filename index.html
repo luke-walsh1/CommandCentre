@@ -1244,6 +1244,18 @@
             localStorage.setItem('dash_projects', JSON.stringify(projects));
         }
 
+        async function syncProject(p) {
+            if (!currentUser) return;
+            const { error } = await _supabase.from('projects').upsert({
+                id: p.id,
+                user_id: currentUser.id,
+                title: p.title,
+                desc: p.desc,
+                tasks: p.tasks
+            }, { onConflict: 'id' });
+            if (error) console.log('Project sync error:', error.message);
+        }
+
         async function addProject() {
             const title = document.getElementById('new-proj-title').value.trim();
             if (!title) return;
@@ -1252,10 +1264,7 @@
             document.getElementById('new-proj-title').value = '';
             document.getElementById('new-proj-desc').value = '';
             renderProjectsList();
-            if (currentUser) {
-                const { error } = await _supabase.from('projects').insert({ id: newP.id, user_id: currentUser.id, title: newP.title, desc: newP.desc, tasks: [] });
-                if (error) console.log('Project insert error:', error.message);
-            }
+            await syncProject(newP);
         }
 
         function openProjectDetail(id) { currentProjectId = id; document.getElementById('projects-list-container').style.display = 'none'; document.getElementById('project-detail-container').style.display = 'block'; renderProjectDetail(); }
@@ -1286,36 +1295,28 @@
             p.tasks.push({ text: input.value.trim(), done: false });
             input.value = '';
             renderProjectDetail();
-            if (currentUser) {
-                const { error } = await _supabase.from('projects').update({ tasks: p.tasks }).eq('id', p.id);
-                if (error) console.log('Task sync error:', error.message);
-            }
+            await syncProject(p);
         }
 
         async function toggleTask(idx) {
             const p = projects.find(i => i.id === currentProjectId);
             p.tasks[idx].done = !p.tasks[idx].done;
             renderProjectDetail();
-            if (currentUser) {
-                const { error } = await _supabase.from('projects').update({ tasks: p.tasks }).eq('id', p.id);
-                if (error) console.log('Task sync error:', error.message);
-            }
+            await syncProject(p);
         }
 
         async function deleteTask(idx) {
             const p = projects.find(i => i.id === currentProjectId);
             p.tasks.splice(idx, 1);
             renderProjectDetail();
-            if (currentUser) {
-                const { error } = await _supabase.from('projects').update({ tasks: p.tasks }).eq('id', p.id);
-                if (error) console.log('Task sync error:', error.message);
-            }
+            await syncProject(p);
         }
 
         async function deleteCurrentProject() {
             if (confirm('Delete project?')) {
-                projects = projects.filter(i => i.id !== currentProjectId);
-                if (currentUser) await _supabase.from('projects').delete().eq('id', currentProjectId);
+                const idToDelete = currentProjectId;
+                projects = projects.filter(i => i.id !== idToDelete);
+                if (currentUser) await _supabase.from('projects').delete().eq('id', idToDelete);
                 backToProjectsList();
             }
         }
@@ -1347,7 +1348,7 @@
             document.getElementById('new-gym-title').value = '';
             document.getElementById('new-gym-desc').value = '';
             renderGymList();
-            if (currentUser) await _supabase.from('gym_routines').insert({ id: newR.id, user_id: currentUser.id, title: newR.title, desc: newR.desc, exercises: [] });
+            if (currentUser) await _supabase.from('gym_routines').upsert({ id: newR.id, user_id: currentUser.id, title: newR.title, desc: newR.desc, exercises: [] }, { onConflict: 'id' });
         }
 
         function openGymDetail(id) { currentGymId = id; document.getElementById('gym-list-container').style.display = 'none'; document.getElementById('gym-detail-container').style.display = 'block'; renderGymDetail(); }
@@ -1365,6 +1366,17 @@
             });
         }
 
+        async function syncGymRoutine(r) {
+            if (!currentUser) return;
+            await _supabase.from('gym_routines').upsert({
+                id: r.id,
+                user_id: currentUser.id,
+                title: r.title,
+                desc: r.desc,
+                exercises: r.exercises
+            }, { onConflict: 'id' });
+        }
+
         async function addExerciseTemplate() {
             const name = document.getElementById('new-ex-name').value.trim();
             if (!name) return;
@@ -1372,14 +1384,14 @@
             r.exercises.push({ name, sets: document.getElementById('new-ex-sets').value.trim()||'3', reps: document.getElementById('new-ex-reps').value.trim()||'10', weight: document.getElementById('new-ex-weight').value.trim()||'0kg' });
             document.getElementById('new-ex-name').value = '';
             renderGymDetail();
-            if (currentUser) await _supabase.from('gym_routines').update({ exercises: r.exercises }).eq('id', r.id);
+            await syncGymRoutine(r);
         }
 
         async function deleteExerciseTemplate(idx) {
             const r = gymRoutines.find(i => i.id === currentGymId);
             r.exercises.splice(idx, 1);
             renderGymDetail();
-            if (currentUser) await _supabase.from('gym_routines').update({ exercises: r.exercises }).eq('id', r.id);
+            await syncGymRoutine(r);
         }
 
         function startQuickWorkout(id) { currentGymId = id; startActiveWorkout(); }
@@ -1494,7 +1506,9 @@
             document.getElementById('new-book-author').value = '';
             document.getElementById('new-book-total').value = '';
             renderBooks();
-            if (currentUser) await _supabase.from('books').insert({ id: newB.id, user_id: currentUser.id, title: newB.title, author: newB.author, current: 0, total });
+            if (currentUser) {
+                await _supabase.from('books').upsert({ id: newB.id, user_id: currentUser.id, title: newB.title, author: newB.author, current: 0, total }, { onConflict: 'id' });
+            }
         }
 
         async function updateBook(idx, delta) {
@@ -1504,7 +1518,15 @@
             books[idx].current = Math.max(0, Math.min(total, current + delta));
             renderBooks();
             if (currentUser) {
-                const { error } = await _supabase.from('books').update({ current: books[idx].current }).eq('id', books[idx].id);
+                const b = books[idx];
+                const { error } = await _supabase.from('books').upsert({
+                    id: b.id,
+                    user_id: currentUser.id,
+                    title: b.title,
+                    author: b.author,
+                    current: b.current,
+                    total: b.total
+                }, { onConflict: 'id' });
                 if (error) console.log('Book sync error:', error.message);
             }
         }
