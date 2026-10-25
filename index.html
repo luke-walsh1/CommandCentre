@@ -601,7 +601,12 @@
         </div>
 
         <div class="matrix-toolbar">
-            <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);" id="habits-subtitle">Daily Routine Tracker</div>
+            <div class="month-nav" style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
+                <button class="tool-btn" onclick="changeHabitWeek(-1)">‹</button>
+                <span id="habit-week-label" style="font-size: 0.85rem; color: var(--text-main);">This Week</span>
+                <button class="tool-btn" onclick="changeHabitWeek(1)">›</button>
+                <button class="tool-btn" onclick="currentHabitWeek()" style="margin-left: 4px;">Current</button>
+            </div>
             <div class="toolbar-btns">
                 <button class="tool-btn active-accent" onclick="openHabitManager()">Edit Habits</button>
             </div>
@@ -1082,14 +1087,25 @@
             if (save) localStorage.setItem('dash_accent_color', hex);
         }
 
-        // --- HABITS (TICKOFF CARD VIEW) ---
+    // --- HABITS (TICKOFF CARD VIEW WITH TIME TRAVEL) ---
         let habits = JSON.parse(localStorage.getItem('dash_matrix_habits')) || [{id:1, name:'Go To Gym'}, {id:2, name:'Do Skincare'}];
         let habitLogs = JSON.parse(localStorage.getItem('dash_matrix_logs')) || {};
+        let habitWeekOffset = 0; // 0 = current week, -1 = last week, etc.
         let isEditingHabits = false;
 
         function openHabitManager() {
             isEditingHabits = !isEditingHabits;
             document.getElementById('habit-input-container').style.display = isEditingHabits ? 'block' : 'none';
+            renderHabitMatrix();
+        }
+
+        function changeHabitWeek(dir) {
+            habitWeekOffset += dir;
+            renderHabitMatrix();
+        }
+
+        function currentHabitWeek() {
+            habitWeekOffset = 0;
             renderHabitMatrix();
         }
 
@@ -1116,17 +1132,26 @@
                 return;
             }
 
-            // Generate last 7 days for horizontal row
+            // Generate 7 days based on the current habitWeekOffset
             const daysList = [];
             for (let i = 6; i >= 0; i--) {
                 const d = new Date();
-                d.setDate(d.getDate() - i);
+                // Shift days back/forward based on offset weeks (7 days per offset)
+                d.setDate(d.getDate() - i + (habitWeekOffset * 7));
                 daysList.push({
                     dateStr: d.toISOString().slice(0, 10),
                     dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
-                    dayNum: d.getDate()
+                    dayNum: d.getDate(),
+                    monthName: d.toLocaleDateString('en-US', { month: 'short' })
                 });
             }
+
+            // Update week label text
+            const firstDay = daysList[0];
+            const lastDay = daysList[6];
+            let labelText = `${firstDay.monthName} ${firstDay.dayNum} - ${lastDay.monthName} ${lastDay.dayNum}`;
+            if (habitWeekOffset === 0) labelText = "This Week (" + labelText + ")";
+            document.getElementById('habit-week-label').textContent = labelText;
 
             let html = '';
             habits.forEach(h => {
