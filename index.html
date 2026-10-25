@@ -301,6 +301,43 @@
             margin-top: 2px;
         }
 
+        /* BOOKS GRID LAYOUT */
+        .books-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .book-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .book-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+
+        .book-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-main);
+            line-height: 1.2;
+        }
+
+        .book-pct {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
         .cal-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -366,7 +403,7 @@
             font-size: 0.85rem;
         }
 
-        .project-card, .gym-card, .book-card {
+        .project-card, .gym-card {
             background: var(--bg-color);
             border: 1px solid var(--border-color);
             border-radius: 10px;
@@ -374,20 +411,20 @@
             margin-bottom: 10px;
         }
 
-        .project-header-row, .gym-header-row, .book-header-row {
+        .project-header-row, .gym-header-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 6px;
         }
 
-        .project-title, .gym-title, .book-title {
+        .project-title, .gym-title {
             font-size: 0.95rem;
             font-weight: 700;
             color: var(--text-main);
         }
 
-        .project-pct, .book-pct {
+        .project-pct {
             font-size: 0.85rem;
             font-weight: 700;
             color: var(--accent);
@@ -593,7 +630,7 @@
         </div>
     </div>
 
-    <!-- HABITS VIEW (TICKOFF STYLE CARDS) -->
+    <!-- HABITS VIEW -->
     <div id="habits-view" class="view">
         <div class="view-header">
             <div class="view-title">Habits & Streaks</div>
@@ -601,11 +638,11 @@
         </div>
 
         <div class="matrix-toolbar">
-            <div class="month-nav" style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
+            <div class="month-nav" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
                 <button class="tool-btn" onclick="changeHabitWeek(-1)">‹</button>
-                <span id="habit-week-label" style="font-size: 0.85rem; color: var(--text-main);">This Week</span>
+                <span id="habit-week-label" style="font-size: 0.8rem; color: var(--text-main);">This Week</span>
                 <button class="tool-btn" onclick="changeHabitWeek(1)">›</button>
-                <button class="tool-btn" onclick="currentHabitWeek()" style="margin-left: 4px;">Current</button>
+                <button class="tool-btn" onclick="currentHabitWeek()" style="margin-left: 2px;">Current</button>
             </div>
             <div class="toolbar-btns">
                 <button class="tool-btn active-accent" onclick="openHabitManager()">Edit Habits</button>
@@ -849,8 +886,7 @@
                 <button class="action-btn" style="width: 100%; padding: 10px;" onclick="addBook()">Add Book</button>
             </div>
         </div>
-        <div class="content-card">
-            <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent); margin-bottom: 8px;">Reading Library</div>
+        <div class="content-card" style="background: transparent; border: none; padding: 0;">
             <div id="books-list-container">
                 <div style="color: var(--text-muted); font-size: 0.85rem;">No books added yet.</div>
             </div>
@@ -1087,10 +1123,10 @@
             if (save) localStorage.setItem('dash_accent_color', hex);
         }
 
-    // --- HABITS (TICKOFF CARD VIEW WITH TIME TRAVEL) ---
+        // --- HABITS (TICKOFF CARD VIEW WITH TIME TRAVEL) ---
         let habits = JSON.parse(localStorage.getItem('dash_matrix_habits')) || [{id:1, name:'Go To Gym'}, {id:2, name:'Do Skincare'}];
         let habitLogs = JSON.parse(localStorage.getItem('dash_matrix_logs')) || {};
-        let habitWeekOffset = 0; // 0 = current week, -1 = last week, etc.
+        let habitWeekOffset = 0;
         let isEditingHabits = false;
 
         function openHabitManager() {
@@ -1132,11 +1168,9 @@
                 return;
             }
 
-            // Generate 7 days based on the current habitWeekOffset
             const daysList = [];
             for (let i = 6; i >= 0; i--) {
                 const d = new Date();
-                // Shift days back/forward based on offset weeks (7 days per offset)
                 d.setDate(d.getDate() - i + (habitWeekOffset * 7));
                 daysList.push({
                     dateStr: d.toISOString().slice(0, 10),
@@ -1146,7 +1180,6 @@
                 });
             }
 
-            // Update week label text
             const firstDay = daysList[0];
             const lastDay = daysList[6];
             let labelText = `${firstDay.monthName} ${firstDay.dayNum} - ${lastDay.monthName} ${lastDay.dayNum}`;
@@ -1529,22 +1562,48 @@
             if (t && !isNaN(t)) { calorieTarget = parseInt(t); renderCalories(); localStorage.setItem('dash_cal_target', calorieTarget); }
         }
 
-        // --- BOOKS ---
+        // --- BOOKS (GRID VIEW) ---
         let books = JSON.parse(localStorage.getItem('dash_books')) || [{id:1, title:'Atomic Habits', author:'James Clear', current:50, total:300}];
 
         function renderBooks() {
             const container = document.getElementById('books-list-container');
-            container.innerHTML = books.length === 0 ? '<div style="color:var(--text-muted); font-size:0.85rem;">No books.</div>' : '';
+            if (books.length === 0) {
+                container.innerHTML = '<div class="content-card" style="text-align:center; color:var(--text-muted);">No books added yet.</div>';
+                return;
+            }
+
+            let html = '<div class="books-grid">';
             books.forEach((b, idx) => {
                 const pct = Math.min(100, Math.round((b.current / b.total) * 100));
-                container.innerHTML += `
+                html += `
                     <div class="book-card">
-                        <div class="book-header-row"><div><div class="book-title">${b.title}</div><div style="font-size:0.75rem; color:var(--text-muted);">${b.author||''}</div></div><span class="book-pct">${pct}%</span></div>
-                        <div style="font-size:0.8rem; color:var(--text-muted); display:flex; justify-content:space-between; margin:4px 0;"><span>Page ${b.current} of ${b.total}</span><span onclick="deleteBook(${idx})" style="color:red; cursor:pointer;">Delete</span></div>
-                        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%;"></div></div>
-                        <div style="display:flex; gap:4px;"><button class="tool-btn" style="flex:1;" onclick="updateBook(${idx},-10)">-10</button><button class="tool-btn" style="flex:1;" onclick="updateBook(${idx},-1)">-1</button><button class="tool-btn active-accent" style="flex:1;" onclick="updateBook(${idx},1)">+1</button><button class="tool-btn active-accent" style="flex:1;" onclick="updateBook(${idx},10)">+10</button></div>
-                    </div>`;
+                        <div>
+                            <div class="book-header-row">
+                                <div>
+                                    <div class="book-title">${b.title}</div>
+                                    <div style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">${b.author||''}</div>
+                                </div>
+                                <span class="book-pct">${pct}%</span>
+                            </div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; margin:6px 0 2px 0;">
+                                <span>Page ${b.current}/${b.total}</span>
+                                <span onclick="deleteBook(${idx})" style="color:red; cursor:pointer;">Delete</span>
+                            </div>
+                            <div class="progress-bar-bg" style="margin-bottom: 8px;">
+                                <div class="progress-bar-fill" style="width:${pct}%;"></div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:3px;">
+                            <button class="tool-btn" style="flex:1; padding:4px 2px;" onclick="updateBook(${idx},-10)">-10</button>
+                            <button class="tool-btn" style="flex:1; padding:4px 2px;" onclick="updateBook(${idx},-1)">-1</button>
+                            <button class="tool-btn active-accent" style="flex:1; padding:4px 2px;" onclick="updateBook(${idx},1)">+1</button>
+                            <button class="tool-btn active-accent" style="flex:1; padding:4px 2px;" onclick="updateBook(${idx},10)">+10</button>
+                        </div>
+                    </div>
+                `;
             });
+            html += '</div>';
+            container.innerHTML = html;
             localStorage.setItem('dash_books', JSON.stringify(books));
         }
 
