@@ -489,13 +489,13 @@
             font-size: 0.75rem;
         }
 
-        .habit-controls {
+        .habit-controls, select {
             display: flex;
             gap: 8px;
             margin-bottom: 12px;
         }
 
-        input[type="text"], input[type="password"], textarea {
+        input[type="text"], input[type="password"], select, textarea {
             width: 100%;
             background: var(--bg-color);
             border: 1px solid var(--border-color);
@@ -505,7 +505,7 @@
             font-size: 0.9rem;
         }
 
-        input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
+        input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
             border-color: var(--accent);
             outline: none;
         }
@@ -784,7 +784,21 @@
                 <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent); margin-bottom: 8px;">Template Exercises</div>
                 <div id="detail-exercises-list"></div>
                 <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-                    <input type="text" id="new-ex-name" placeholder="Exercise name (e.g. Incline Bench Press)">
+                    <!-- Dropdown for standard exercises + custom option -->
+                    <select id="exercise-dropdown" onchange="checkCustomExercise(this)">
+                        <option value="Bench Press">Barbell Bench Press</option>
+                        <option value="Incline Dumbbell Press">Incline Dumbbell Press</option>
+                        <option value="Squat">Barbell Back Squat</option>
+                        <option value="Deadlift">Conventional Deadlift</option>
+                        <option value="Overhead Press">Overhead Press (OHP)</option>
+                        <option value="Lat Pulldown">Lat Pulldown Machine</option>
+                        <option value="Barbell Row">Barbell Row</option>
+                        <option value="Bicep Curl">Dumbbell Bicep Curl</option>
+                        <option value="Tricep Pushdown">Tricep Cable Pushdown</option>
+                        <option value="Leg Press">Leg Press Machine</option>
+                        <option value="custom">➕ Add Custom Exercise...</option>
+                    </select>
+                    <input type="text" id="custom-ex-name" placeholder="Type custom exercise name..." style="display:none;">
                     <div style="display: flex; gap: 8px;">
                         <input type="text" id="new-ex-sets" placeholder="Sets (e.g. 4)">
                         <input type="text" id="new-ex-reps" placeholder="Target Reps (e.g. 8-10)">
@@ -808,7 +822,7 @@
         </div>
         <div class="content-card" style="background: var(--accent-dim); border-color: var(--accent);">
             <div style="font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-bottom: 2px;">SESSION IN PROGRESS</div>
-            <div style="font-size: 0.8rem; color: var(--text-main);">Log your actual performance for each exercise below. Hit finish when done.</div>
+            <div style="font-size: 0.8rem; color: var(--text-main);">Log actual performance. Check your previous weight hint to practice progressive overload!</div>
         </div>
         <div class="content-card">
             <div id="active-exercises-container"></div>
@@ -823,8 +837,8 @@
             <button class="back-btn" onclick="switchView('home-view')">Home Menu</button>
         </div>
         <div class="content-card">
-            <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent); margin-bottom: 6px;">Progressive Overload Log</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Review past completed sessions and weight/reps progression.</div>
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--accent); margin-bottom: 6px;">Progressive Overload & 1RM Log</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Review past sessions, estimated 1RM, and % gains.</div>
             <div id="gym-history-container"></div>
         </div>
     </div>
@@ -1011,42 +1025,33 @@
         async function loadAllDataFromCloud() {
             if (!currentUser) return;
             try {
-                // Load Habits
                 const { data: hData } = await _supabase.from('habits').select('*').eq('user_id', currentUser.id);
                 if (hData && hData.length > 0) habits = hData;
 
-                // Load Habit Logs
                 const { data: lData } = await _supabase.from('habit_logs').select('*').eq('user_id', currentUser.id);
                 if (lData) {
                     habitLogs = {};
-                    lData.forEach(row => {
-                        habitLogs[row.date + '-' + row.habit_id] = row.completed;
-                    });
+                    lData.forEach(row => { habitLogs[row.date + '-' + row.habit_id] = row.completed; });
                 }
 
-                // Load Calendar Events
                 const { data: cData } = await _supabase.from('calendar_events').select('*').eq('user_id', currentUser.id);
                 if (cData) {
                     calendarEvents = {};
                     cData.forEach(row => { calendarEvents[row.date] = row.events; });
                 }
 
-                // Load Projects
                 const { data: pData } = await _supabase.from('projects').select('*').eq('user_id', currentUser.id);
                 if (pData && pData.length > 0) projects = pData;
 
-                // Load Gym Routines & History
                 const { data: gData } = await _supabase.from('gym_routines').select('*').eq('user_id', currentUser.id);
                 if (gData && gData.length > 0) gymRoutines = gData;
 
                 const { data: ghData } = await _supabase.from('gym_history').select('*').eq('user_id', currentUser.id);
                 if (ghData && ghData.length > 0) gymHistory = ghData;
 
-                // Load Books
                 const { data: bData } = await _supabase.from('books').select('*').eq('user_id', currentUser.id);
                 if (bData && bData.length > 0) books = bData;
 
-                // Load Quick Notes
                 const { data: nData } = await _supabase.from('quick_notes').select('*').eq('user_id', currentUser.id).maybeSingle();
                 if (nData) document.getElementById('scratchpad-textarea').value = nData.content || '';
 
@@ -1123,7 +1128,7 @@
             if (save) localStorage.setItem('dash_accent_color', hex);
         }
 
-        // --- HABITS (TICKOFF CARD VIEW WITH TIME TRAVEL) ---
+        // --- HABITS ---
         let habits = JSON.parse(localStorage.getItem('dash_matrix_habits')) || [{id:1, name:'Go To Gym'}, {id:2, name:'Do Skincare'}];
         let habitLogs = JSON.parse(localStorage.getItem('dash_matrix_logs')) || {};
         let habitWeekOffset = 0;
@@ -1412,10 +1417,20 @@
             }
         }
 
-        // --- GYM ROUTINES & STATS ---
+        // --- GYM ROUTINES & STATS (UPGRADED) ---
         let gymRoutines = JSON.parse(localStorage.getItem('dash_gym_routines')) || [{id:1, title:'Push Day', desc:'Chest & Triceps', exercises:[{name:'Bench Press', sets:'4', reps:'8', weight:'80kg'}]}];
         let gymHistory = JSON.parse(localStorage.getItem('dash_gym_history')) || [];
         let currentGymId = null, activeWorkoutSession = null;
+
+        function checkCustomExercise(selectEl) {
+            const customInput = document.getElementById('custom-ex-name');
+            if (selectEl.value === 'custom') {
+                customInput.style.display = 'block';
+                customInput.focus();
+            } else {
+                customInput.style.display = 'none';
+            }
+        }
 
         function renderGymList() {
             const container = document.getElementById('gym-cards-list');
@@ -1463,11 +1478,17 @@
         }
 
         async function addExerciseTemplate() {
-            const name = document.getElementById('new-ex-name').value.trim();
-            if (!name) return;
+            const dropdown = document.getElementById('exercise-dropdown');
+            let name = dropdown.value;
+            if (name === 'custom') {
+                name = document.getElementById('custom-ex-name').value.trim();
+                if (!name) return;
+            }
             const r = gymRoutines.find(i => i.id === currentGymId);
             r.exercises.push({ name, sets: document.getElementById('new-ex-sets').value.trim()||'3', reps: document.getElementById('new-ex-reps').value.trim()||'10', weight: document.getElementById('new-ex-weight').value.trim()||'0kg' });
-            document.getElementById('new-ex-name').value = '';
+            document.getElementById('custom-ex-name').value = '';
+            document.getElementById('custom-ex-name').style.display = 'none';
+            dropdown.selectedIndex = 0;
             renderGymDetail();
             await syncGymRoutine(r);
         }
@@ -1480,6 +1501,21 @@
         }
 
         function startQuickWorkout(id) { currentGymId = id; startActiveWorkout(); }
+
+        // Helper to find last recorded performance for an exercise
+        function getLastPerformance(exerciseName) {
+            for (let session of gymHistory) {
+                if (session.exercises) {
+                    for (let ex of session.exercises) {
+                        if (ex.name.toLowerCase() === exerciseName.toLowerCase()) {
+                            return `${ex.actualWeight || ex.weight || '0kg'} × ${ex.actualReps || ex.reps || '0'} reps (${session.date})`;
+                        }
+                    }
+                }
+            }
+            return 'First time logging this exercise!';
+        }
+
         function startActiveWorkout() {
             const r = gymRoutines.find(i => i.id === currentGymId);
             if (!r || r.exercises.length === 0) { alert('Add exercises first.'); return; }
@@ -1487,8 +1523,18 @@
             document.getElementById('active-workout-title').textContent = `Live: ${r.title}`;
             const container = document.getElementById('active-exercises-container');
             container.innerHTML = '';
+            
             activeWorkoutSession.exercises.forEach((ex, idx) => {
-                container.innerHTML += `<div style="background:var(--bg-color); border:1px solid var(--border-color); padding:8px; margin-bottom:8px; border-radius:6px;"><div style="font-weight:700; color:var(--accent);">${ex.name}</div><div style="display:flex; gap:8px; margin-top:4px;"><input type="text" id="act-wt-${idx}" value="${ex.actualWeight}"><input type="text" id="act-reps-${idx}" value="${ex.actualReps}"></div></div>`;
+                const lastPerf = getLastPerformance(ex.name);
+                container.innerHTML += `
+                    <div style="background:var(--bg-color); border:1px solid var(--border-color); padding:10px; margin-bottom:10px; border-radius:8px;">
+                        <div style="font-weight:700; color:var(--accent); font-size:0.95rem;">${ex.name}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">🕒 Last time: <span style="color:var(--text-main);">${lastPerf}</span></div>
+                        <div style="display:flex; gap:8px;">
+                            <div style="flex:1;"><span style="font-size:0.7rem; color:var(--text-muted);">Weight</span><input type="text" id="act-wt-${idx}" value="${ex.actualWeight}"></div>
+                            <div style="flex:1;"><span style="font-size:0.7rem; color:var(--text-muted);">Reps</span><input type="text" id="act-reps-${idx}" value="${ex.actualReps}"></div>
+                        </div>
+                    </div>`;
             });
             switchView('gym-active-view');
         }
@@ -1497,23 +1543,63 @@
             activeWorkoutSession.exercises.forEach((ex, idx) => {
                 ex.actualWeight = document.getElementById(`act-wt-${idx}`).value;
                 ex.actualReps = document.getElementById(`act-reps-${idx}`).value;
+
+                // Calculate estimated 1RM and % increase compared to last time
+                let cleanWeight = parseFloat(ex.actualWeight) || 0;
+                let cleanReps = parseInt(ex.actualReps) || 1;
+                ex.est1RM = Math.round(cleanWeight * (1 + cleanReps / 30));
+
+                // Find previous weight for comparison
+                let prevWeight = 0;
+                for (let session of gymHistory) {
+                    let found = session.exercises?.find(e => e.name.toLowerCase() === ex.name.toLowerCase());
+                    if (found) {
+                        prevWeight = parseFloat(found.actualWeight || found.weight) || 0;
+                        break;
+                    }
+                }
+                if (prevWeight > 0) {
+                    ex.pctIncrease = Math.round(((cleanWeight - prevWeight) / prevWeight) * 100);
+                } else {
+                    ex.pctIncrease = 0;
+                }
             });
+
             gymHistory.unshift(activeWorkoutSession);
             localStorage.setItem('dash_gym_history', JSON.stringify(gymHistory));
             if (currentUser) await _supabase.from('gym_history').insert({ user_id: currentUser.id, routine_title: activeWorkoutSession.routineTitle, date: activeWorkoutSession.date, exercises_json: activeWorkoutSession.exercises });
             activeWorkoutSession = null;
-            switchView('gym-view');
-            backToGymList();
+            switchView('gym-stats-view');
         }
+
         function cancelActiveWorkout() { activeWorkoutSession = null; switchView('gym-view'); }
 
         function renderGymStats() {
             const container = document.getElementById('gym-history-container');
             container.innerHTML = gymHistory.length === 0 ? '<div style="color:var(--text-muted); text-align:center;">No completed workouts.</div>' : '';
+            
             gymHistory.forEach(s => {
                 let exHtml = '';
-                s.exercises.forEach(e => exHtml += `<div style="font-size:0.8rem; display:flex; justify-content:between;"><span>${e.name}</span><span style="color:var(--accent);">${e.actualWeight} × ${e.actualReps}</span></div>`);
-                container.innerHTML += `<div style="background:var(--bg-color); border:1px solid var(--border-color); padding:8px; margin-bottom:8px; border-radius:6px;"><div style="font-weight:700; color:var(--accent);">${s.routineTitle} <span style="font-size:0.75rem; color:var(--text-muted); float:right;">${s.date}</span></div>${exHtml}</div>`;
+                s.exercises.forEach(e => {
+                    let badge = '';
+                    if (e.pctIncrease > 0) badge = ` <span style="color:#00ff66; font-size:0.7rem; font-weight:750;">(+${e.pctIncrease}% 🚀)</span>`;
+                    else if (e.pctIncrease < 0) badge = ` <span style="color:red; font-size:0.7rem;">(${e.pctIncrease}%)</span>`;
+
+                    exHtml += `
+                        <div style="font-size:0.8rem; border-top:1px solid var(--border-color); padding-top:4px; margin-top:4px;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <span style="font-weight:600;">${e.name}</span>
+                                <span style="color:var(--accent);">${e.actualWeight} × ${e.actualReps} reps ${badge}</span>
+                            </div>
+                            <div style="font-size:0.7rem; color:var(--text-muted);">Est. 1RM: ~${e.est1RM || 0}kg</div>
+                        </div>`;
+                });
+
+                container.innerHTML += `
+                    <div style="background:var(--bg-color); border:1px solid var(--border-color); padding:10px; margin-bottom:10px; border-radius:8px;">
+                        <div style="font-weight:700; color:var(--accent); margin-bottom:4px;">${s.routineTitle} <span style="font-size:0.75rem; color:var(--text-muted); float:right;">${s.date}</span></div>
+                        ${exHtml}
+                    </div>`;
             });
         }
 
