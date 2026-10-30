@@ -220,7 +220,7 @@ var QUOTES=['Do the next small thing well.','Consistency beats intensity.','Prot
 var EXS=['Barbell Bench Press','Incline Dumbbell Press','Barbell Back Squat','Conventional Deadlift','Overhead Press','Lat Pulldown','Machine Barbell Row','Dumbbell Bicep Curl','Tricep Cable Pushdown','Leg Press','Romanian Deadlift','Pull-up','Lateral Raise','Walking Lunge'];
 var HUES={Indigo:235,Teal:178,Amber:40,Rose:345,Green:140,Violet:280};
 
-/* ---------- state ---------- */
+/* ---------- state & auto-migration ---------- */
 var KEY='command-centre-v2';
 function defaults(){
   var r={};for(var i=0;i<7;i++)r[i]={name:'',ex:[]};
@@ -230,18 +230,58 @@ function defaults(){
     goal:3300,meals:{},books:[],notes:[],
     focusCfg:{focus:25,short:5,long:15},sessions:{},todayFocus:{}};
 }
+
+function loadLocal(){
+  try{
+    var s=localStorage.getItem(KEY);
+    if(s)return normalise(JSON.parse(s));
+    
+    // AUTO-MIGRATE FROM OLD KEYS IF THEY EXIST IN THIS BROWSER
+    var oldHabits = localStorage.getItem('dash_matrix_habits');
+    var oldProj = localStorage.getItem('dash_projects');
+    var oldBooks = localStorage.getItem('dash_books');
+    var oldNotes = localStorage.getItem('dash_quick_notes');
+    var oldCalTarget = localStorage.getItem('dash_cal_target');
+    var oldCalLogs = localStorage.getItem('dash_cal_logs');
+    
+    if(oldHabits || oldProj || oldBooks || oldNotes || oldCalTarget || oldCalLogs) {
+      var def = defaults();
+      if(oldHabits) {
+        try { def.habits = JSON.parse(oldHabits); } catch(e){}
+      }
+      if(oldProj) {
+        try { def.projects = JSON.parse(oldProj); } catch(e){}
+      }
+      if(oldBooks) {
+        try { def.books = JSON.parse(oldBooks); } catch(e){}
+      }
+      if(oldNotes) {
+        def.notes = [{id:uid(), title:'Imported Quick Note', body:oldNotes, pin:true, t:Date.now()}];
+      }
+      if(oldCalTarget) {
+        def.goal = parseInt(oldCalTarget) || 3300;
+      }
+      if(oldCalLogs) {
+        try { def.meals = JSON.parse(oldCalLogs); } catch(e){}
+      }
+      return normalise(def);
+    }
+  }catch(e){}
+  return null;
+}
+
 var S=defaults();
 function normalise(o){var d=defaults();for(var k in d){if(o[k]===undefined)o[k]=d[k]}for(var i=0;i<7;i++){if(!o.routines[i])o.routines[i]={name:'',ex:[]}}return o}
 var ui={view:'home',weekOff:0,cal:{y:new Date().getFullYear(),m:new Date().getMonth()},sel:iso(new Date()),proj:null,planDay:(new Date().getDay()+6)%7,calDate:iso(new Date()),editNote:null,noteQ:'',editH:false,confirm:null,sync:'Local only',importOpen:false,exportText:'',
   t:{mode:'focus',remaining:25*60,end:0,running:false}};
-/* ===== Supabase config ===== */
+  
+/* ===== Supabase config: replace with your keys ===== */
 var SUPABASE_URL='https://vjyawtxmobxgclrwsgfx.supabase.co';        
 var SUPABASE_ANON_KEY='sb_publishable_8kujQY7du_nwIN8DvYvBxw_MeW-ZsjN'; 
 var TABLE='dashboard_state';                 
 var CFG_OK=SUPABASE_URL.indexOf('YOUR_')<0&&SUPABASE_ANON_KEY.indexOf('YOUR_')<0;
 var sb=null,session=null,saveTimer=null,pushing=false,pushAgain=false;
 
-function loadLocal(){try{var s=localStorage.getItem(KEY);if(s)return normalise(JSON.parse(s))}catch(e){}return null}
 function save(){
   S.updated=Date.now();
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
@@ -649,7 +689,16 @@ function setView(v){if(!V[v])v='home';ui.view=v;ui.confirm=null;render();window.
 window.addEventListener('hashchange',function(){setView(location.hash.replace('#','')||'home')});
 
 /* ---------- boot ---------- */
-(function(){var l=loadLocal();if(l)S=l;applyTheme();var h=location.hash.replace('#','');ui.view=V[h]?h:'home';ui.t.remaining=S.focusCfg.focus*60;render();connect()})();
+(function(){
+  var l=loadLocal();
+  if(l) S=l;
+  applyTheme();
+  var h=location.hash.replace('#','');
+  ui.view=V[h]?h:'home';
+  ui.t.remaining=S.focusCfg.focus*60;
+  render();
+  connect();
+})();
 })();
 </script>
 </body>
